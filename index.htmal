@@ -1,0 +1,832 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="theme-color" content="#d97706">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="EarthWatch">
+  <title>EarthWatch</title>
+  <meta name="description" content="EarthWatch — Stay informed about hazards affecting places you care about. Earthquakes, severe weather, fires, volcanoes. Anywhere in the world. Free.">
+  <meta name="keywords" content="earthwatch, hazard alerts, earthquake alerts, weather alerts, fire alerts, volcano alerts">
+  <meta name="robots" content="index, follow">
+  <meta name="author" content="EarthWatch">
+  <link rel="canonical" href="https://earthwatch.app">
+  <meta property="og:title" content="EarthWatch — Hazards near places you care about">
+  <meta property="og:description" content="Add places to your watchlist. Get notified about earthquakes, severe weather, fires, and more.">
+  <meta property="og:url" content="https://earthwatch.app">
+  <meta property="og:type" content="website">
+  <meta property="og:image" content="https://raw.githubusercontent.com/bspencer413/earthwatch-frontend/main/ew_icon.png">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="EarthWatch — Hazards near places you care about">
+  <meta name="twitter:description" content="Add places to your watchlist. Get notified about hazards.">
+  <meta name="twitter:image" content="https://raw.githubusercontent.com/bspencer413/earthwatch-frontend/main/ew_icon.png">
+  <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjogIkVhcnRoV2F0Y2giLCAic2hvcnRfbmFtZSI6ICJFVyIsICJzdGFydF91cmwiOiAiLyIsICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLCAiYmFja2dyb3VuZF9jb2xvciI6ICIjMGEwYTBhIiwgInRoZW1lX2NvbG9yIjogIiNkOTc3MDYiLCAiaWNvbnMiOiBbeyJzcmMiOiAiaHR0cHM6Ly9yYXcuZ2l0aHVidXNlcmNvbnRlbnQuY29tL2JzcGVuY2VyNDEzL2VhcnRod2F0Y2gtZnJvbnRlbmQvbWFpbi9ld19pY29uLnBuZyIsICJzaXplcyI6ICI1MTJ4NTEyIiwgInR5cGUiOiAiaW1hZ2UvcG5nIn1dfQ==">
+  <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/bspencer413/earthwatch-frontend/main/ew_icon.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+  <style>
+    * { -webkit-tap-highlight-color: transparent; font-family: Georgia, 'Times New Roman', serif; }
+    html, body { height: 100%; overflow-x: hidden; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+    .tap-pulse { animation: pulse 1.8s ease-in-out infinite; }
+    .modal-drawer {
+      position: fixed; bottom: 0; left: 0; right: 0; z-index: 100;
+      background: #1c1917; border-radius: 20px 20px 0 0;
+      border-top: 1px solid #92400e;
+      max-height: 85vh; overflow-y: auto;
+      transform: translateY(0);
+      transition: transform 0.3s ease;
+      padding-bottom: max(1rem, env(safe-area-inset-bottom));
+    }
+    .modal-overlay { position: fixed; inset: 0; z-index: 99; background: rgba(0,0,0,0.6); }
+  </style>
+</head>
+<body style="margin:0;padding:0;">
+<div id="root"></div>
+<script type="text/babel">
+const { useState, useEffect } = React;
+
+const API_BASE = 'https://earthwatch-backend.onrender.com';
+const EW_BG = 'https://raw.githubusercontent.com/bspencer413/earthwatch-frontend/main/earthwatch_bg.jpg';
+const EW_LOGIN_BG = 'https://raw.githubusercontent.com/bspencer413/earthwatch-frontend/main/earthwatch_bg.jpg';
+const EW_LOGO = 'https://raw.githubusercontent.com/bspencer413/earthwatch-frontend/main/ew_icon.png';
+const BILL_PHOTO = 'https://raw.githubusercontent.com/bspencer413/memorial-watch/main/Bill.jpeg';
+const APP_VERSION = '0.1.0';
+
+// === CW LEGACY (commented for EW) ============================================
+// FLEET_DATA, RISK_INDICATORS, findCruiseLineKey, editDistance, findShipSuggestion,
+// advisoryLevelStyle, seaStateStyle, formatWaveHeight, cleanAdvisoryText,
+// truncateWords, parseRiskChips removed — EarthWatch has no ship registry, no
+// State Dept advisories, no marine sea-state. Restore from CW v0.1.42 if needed.
+// ==============================================================================
+
+// === MW LEGACY (commented for EW) =============================================
+// extractYear, getSsdiCache, cacheSsdiRecord, getCachedSsdi, getCachedSsdiFlexible,
+// normalizeForWiki, addInitialPeriods, fuzzyMatch, parseBirthYear, scoreResult,
+// confidenceLabel, isDeceasedCheck, SsdiRecordBlock, SsdiRecordDrawer all removed —
+// EarthWatch matches places by lat/lng, not names. Restore from CW v0.1.42 if needed.
+// ==============================================================================
+
+// ── EW helpers ────────────────────────────────────────────────────────────────
+
+const toTitleCase = (str) => {
+  if (!str) return '';
+  return str.toLowerCase().split(' ').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ');
+};
+
+const smartTitleCase = (str) => {
+  if (!str) return '';
+  return toTitleCase(str.trim());
+};
+
+// Hazard type → emoji icon. Kept compact for the drawer cards.
+const hazardIcon = (type) => {
+  if (type === 'earthquake') return '🌐';
+  if (type === 'severe_weather' || type === 'storm') return '⛈️';
+  if (type === 'tornado') return '🌪️';
+  if (type === 'hurricane' || type === 'tropical_cyclone') return '🌀';
+  if (type === 'wildfire' || type === 'fire') return '🔥';
+  if (type === 'volcano') return '🌋';
+  if (type === 'flood') return '💧';
+  if (type === 'tsunami') return '🌊';
+  if (type === 'winter_storm' || type === 'ice') return '❄️';
+  return '⚠️';
+};
+
+// Severity → color + label. Maps the four-bucket severity from the backend
+// (minor / moderate / severe / extreme) to amber-stack styling.
+const severityStyle = (sev) => {
+  if (sev === 'extreme') return { border: '#dc2626', headerBg: '#991b1b', cardBg: 'rgba(127,29,29,0.45)', label: 'Extreme' };
+  if (sev === 'severe')  return { border: '#ea580c', headerBg: '#9a3412', cardBg: 'rgba(124,45,18,0.45)', label: 'Severe' };
+  if (sev === 'moderate')return { border: '#d97706', headerBg: '#92400e', cardBg: 'rgba(120,53,15,0.45)', label: 'Moderate' };
+  return { border: '#a16207', headerBg: '#713f12', cardBg: 'rgba(113,63,18,0.35)', label: 'Minor' };
+};
+
+const formatDistance = (mi) => {
+  if (mi == null) return '';
+  if (mi < 1) return '< 1 mi';
+  if (mi < 10) return mi.toFixed(1) + ' mi';
+  return Math.round(mi) + ' mi';
+};
+
+const formatRelativeTime = (iso) => {
+  if (!iso) return '';
+  try {
+    const t = new Date(iso.replace(' ', 'T') + (iso.indexOf('Z') === -1 && iso.indexOf('+') === -1 ? 'Z' : ''));
+    const diffMs = Date.now() - t.getTime();
+    const min = Math.floor(diffMs / 60000);
+    if (min < 1) return 'just now';
+    if (min < 60) return min + ' min ago';
+    const hrs = Math.floor(min / 60);
+    if (hrs < 24) return hrs + ' hr ago';
+    const days = Math.floor(hrs / 24);
+    if (days < 30) return days + ' day' + (days === 1 ? '' : 's') + ' ago';
+    return t.toLocaleDateString();
+  } catch (e) { return ''; }
+};
+
+const RADIUS_PRESETS = [25, 50, 100, 250];
+
+// ── Icon components (kept) ────────────────────────────────────────────────────
+
+const SearchIcon = () => (
+  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+);
+
+const HeartIcon = () => (
+  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" /></svg>
+);
+
+const InfoIcon = () => (
+  <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+);
+
+const BellIcon = ({ red }) => (
+  <svg className={'w-7 h-7 ' + (red ? 'tap-pulse' : '')} fill={red ? '#dc2626' : 'none'} stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+);
+
+const PlusIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+);
+
+const TrashIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+);
+
+const EditIcon = () => (
+  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+);
+
+const CheckIcon = () => (
+  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+);
+
+const EyeIcon = () => (
+  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+);
+
+const EyeOffIcon = () => (
+  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" /></svg>
+);
+
+const ClearableInput = ({ value, onChange, onBlur, onKeyPress, placeholder, type='text', maxLength, inputClass, numeric }) => (
+  <div className="relative">
+    <input type={type} value={value} onChange={onChange} onBlur={onBlur} onKeyPress={onKeyPress} placeholder={placeholder} maxLength={maxLength} inputMode={numeric ? 'decimal' : undefined} className={inputClass + ' pr-10'} autoCorrect="off" autoCapitalize={numeric ? 'off' : undefined} spellCheck="false" />
+    {value && (
+      <button onClick={() => onChange({ target: { value: '' } })} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white text-xl font-bold leading-none" type="button">X</button>
+    )}
+  </div>
+);
+
+const CardPageHeader = ({ title, subtitle }) => (
+  <div className="mb-3 pb-2 border-b border-amber-900/30 text-center">
+    <h2 className="text-4xl font-black text-white tracking-wide">{title}</h2>
+    {subtitle && <p className="text-amber-300 italic text-xl mt-1">{subtitle}</p>}
+  </div>
+);
+
+const POSTER_STYLE = {
+  backgroundColor: '#0a0a0a',
+  backgroundImage: 'url(' + EW_BG + ')',
+  backgroundSize: 'cover',
+  backgroundPosition: 'center top',
+  backgroundRepeat: 'no-repeat',
+  backgroundAttachment: 'scroll',
+};
+
+const WOOD_STYLE = {
+  backgroundColor: '#0a0a0a',
+  backgroundImage: 'url(' + EW_BG + ')',
+  backgroundSize: 'cover',
+  backgroundPosition: 'center top',
+  backgroundRepeat: 'no-repeat',
+  backgroundAttachment: 'scroll',
+  filter: 'none',
+};
+
+const PageWrapper = ({ children, bgStyle }) => {
+  var bg = bgStyle || POSTER_STYLE;
+  var isListPage = bg === WOOD_STYLE;
+  return (
+    <div style={{ minHeight: '100dvh', width: '100%', position: 'relative', paddingTop: 'env(safe-area-inset-top)', paddingBottom: '5rem', backgroundColor: bg.backgroundColor, backgroundImage: bg.backgroundImage || 'none', backgroundSize: bg.backgroundSize || 'auto', backgroundPosition: bg.backgroundPosition || 'top', backgroundRepeat: bg.backgroundRepeat || 'no-repeat', backgroundAttachment: bg.backgroundAttachment || 'scroll' }}>
+      {isListPage && <div style={{ position: 'fixed', inset: 0, backdropFilter: 'blur(8px)', WebkitBackdropFilter: 'blur(8px)', backgroundColor: 'rgba(10,10,10,0.55)', zIndex: 0 }} />}
+      <div style={{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: isListPage ? 'transparent' : 'rgba(10,10,10,0.30)' }} />
+      <div style={{ position: 'relative', zIndex: 10 }}>{children}</div>
+    </div>
+  );
+};
+function App() {
+  const [page, setPage] = useState('login');
+  const [auth, setAuth] = useState(false);
+  const [user, setUser] = useState(null);
+  const [places, setPlaces] = useState([]);
+  const [notifications, setNotifications] = useState([]);
+  const [expandedAlertGroups, setExpandedAlertGroups] = useState({});
+  const [loading, setLoading] = useState(false);
+  const [backendWaking, setBackendWaking] = useState(false);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [newPlace, setNewPlace] = useState({ name: '', lat: '', lng: '', radius: 50 });
+  const [editingId, setEditingId] = useState(null);
+  const [editingName, setEditingName] = useState('');
+  const [showDangerZone, setShowDangerZone] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [drawerData, setDrawerData] = useState(null);
+  const [drawerLoading, setDrawerLoading] = useState(false);
+  const [apiVersion, setApiVersion] = useState('...');
+  const [addPlaceMsg, setAddPlaceMsg] = useState('');
+
+  // Viewport sizing
+  const [viewportW, setViewportW] = useState(typeof window !== 'undefined' ? window.innerWidth : 400);
+  useEffect(() => {
+    const onResize = () => setViewportW(window.innerWidth);
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+  const isPhone = viewportW < 640;
+  const isTablet = viewportW >= 640 && viewportW < 1024;
+
+  useEffect(() => {
+    fetch(API_BASE + '/health').then(r => r.json()).then(d => setApiVersion(d.version || '?')).catch(() => setApiVersion('?'));
+    const t = localStorage.getItem('ew_token');
+    const u = localStorage.getItem('ew_user');
+    if (t && u) {
+      try { setUser(JSON.parse(u)); setAuth(true); setPage('search'); loadPlaces(); loadNotifications(); }
+      catch(e) { localStorage.removeItem('ew_token'); localStorage.removeItem('ew_user'); }
+    }
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        setTimeout(() => { document.querySelectorAll('input').forEach(i => i.blur()); }, 100);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => document.removeEventListener('visibilitychange', handleVisibilityChange);
+  }, []);
+
+  const loadPlaces = async () => {
+    try {
+      const token = localStorage.getItem('ew_token');
+      const r = await fetch(API_BASE + '/ew/places', { headers: { 'Authorization': 'Bearer ' + token } });
+      if (!r.ok) throw new Error('Failed');
+      setPlaces(await r.json());
+    } catch (e) { console.error(e); }
+  };
+
+  const loadNotifications = async () => {
+    try {
+      const token = localStorage.getItem('ew_token');
+      const r = await fetch(API_BASE + '/notifications', { headers: { 'Authorization': 'Bearer ' + token } });
+      if (!r.ok) throw new Error('Failed');
+      setNotifications(await r.json());
+    } catch (e) { console.error(e); }
+  };
+
+  const dismissAlert = async (notifId) => {
+    const token = localStorage.getItem('ew_token');
+    setNotifications(prev => prev.filter(n => n.id !== notifId));
+    try { await fetch(API_BASE + '/notifications/' + notifId, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } }); } catch(e) {}
+  };
+
+  const doAuth = async (mode) => {
+    if (!email || !password) return;
+    setLoading(true);
+    setBackendWaking(false);
+    const wakingTimer = setTimeout(() => setBackendWaking(true), 3500);
+    try {
+      const r = await fetch(API_BASE + '/auth/' + mode, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: email, password: password })
+      });
+      clearTimeout(wakingTimer);
+      setBackendWaking(false);
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        alert(err.detail || 'Authentication failed');
+        setLoading(false);
+        return;
+      }
+      const data = await r.json();
+      localStorage.setItem('ew_token', data.access_token);
+      const u = { email: email };
+      localStorage.setItem('ew_user', JSON.stringify(u));
+      setUser(u); setAuth(true); setPage('search');
+      await loadPlaces();
+      await loadNotifications();
+    } catch (e) {
+      clearTimeout(wakingTimer);
+      setBackendWaking(false);
+      alert('Network error: ' + e.message);
+    }
+    setLoading(false);
+  };
+
+  const doLogout = () => {
+    localStorage.removeItem('ew_token');
+    localStorage.removeItem('ew_user');
+    setUser(null); setAuth(false); setPlaces([]); setNotifications([]);
+    setPage('login');
+  };
+
+  const doDeleteAccount = async () => {
+    const token = localStorage.getItem('ew_token');
+    try {
+      await fetch(API_BASE + '/account', { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
+    } catch(e) {}
+    doLogout();
+  };
+
+  const addPlace = async () => {
+    setAddPlaceMsg('');
+    const name = (newPlace.name || '').trim();
+    const lat = parseFloat(newPlace.lat);
+    const lng = parseFloat(newPlace.lng);
+    const radius = parseFloat(newPlace.radius) || 50;
+    if (!name) { setAddPlaceMsg('Please enter a name for this place.'); return; }
+    if (isNaN(lat) || lat < -90 || lat > 90) { setAddPlaceMsg('Latitude must be between -90 and 90.'); return; }
+    if (isNaN(lng) || lng < -180 || lng > 180) { setAddPlaceMsg('Longitude must be between -180 and 180.'); return; }
+    const token = localStorage.getItem('ew_token');
+    try {
+      const r = await fetch(API_BASE + '/ew/places', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ name: name, lat: lat, lng: lng, radius_mi: radius, alert_level: 'realtime' })
+      });
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({}));
+        setAddPlaceMsg(err.detail || 'Failed to add place.');
+        return;
+      }
+      setNewPlace({ name: '', lat: '', lng: '', radius: 50 });
+      setAddPlaceMsg('Added "' + name + '" to your watchlist.');
+      await loadPlaces();
+      setTimeout(() => { setAddPlaceMsg(''); setPage('watchlist'); }, 900);
+    } catch (e) {
+      setAddPlaceMsg('Network error: ' + e.message);
+    }
+  };
+
+  const removePlace = async (id) => {
+    const token = localStorage.getItem('ew_token');
+    try {
+      await fetch(API_BASE + '/ew/places/' + id, { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + token } });
+      await loadPlaces();
+    } catch(e) {}
+  };
+
+  const setPlaceArchived = async (id, archived) => {
+    const token = localStorage.getItem('ew_token');
+    try {
+      await fetch(API_BASE + '/ew/places/' + id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ is_archived: archived })
+      });
+      await loadPlaces();
+    } catch(e) {}
+  };
+
+  const renamePlace = async (id, name) => {
+    const token = localStorage.getItem('ew_token');
+    try {
+      await fetch(API_BASE + '/ew/places/' + id, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+        body: JSON.stringify({ name: name })
+      });
+      await loadPlaces();
+    } catch(e) {}
+  };
+
+  const openPlaceDrawer = async (place) => {
+    setDrawerData({ place: place, events: [], count: 0 });
+    setDrawerLoading(true);
+    const token = localStorage.getItem('ew_token');
+    try {
+      const r = await fetch(API_BASE + '/ew/places/' + place.id + '/events', { headers: { 'Authorization': 'Bearer ' + token } });
+      if (r.ok) {
+        const data = await r.json();
+        setDrawerData(data);
+      }
+    } catch(e) { console.error(e); }
+    setDrawerLoading(false);
+  };
+
+  const HazardDrawer = () => {
+    if (!drawerData) return null;
+    const place = drawerData.place || {};
+    const events = drawerData.events || [];
+    return (
+      <div>
+        <div className="modal-overlay" onClick={() => setDrawerData(null)} />
+        <div className="modal-drawer">
+          <div className="px-4 pt-4 pb-2 border-b border-amber-900/40 flex items-start justify-between">
+            <div className="flex-1 min-w-0 pr-2">
+              <h2 className="text-2xl font-bold text-white truncate">{place.name}</h2>
+              <p className="text-amber-300 text-base">
+                {Number(place.lat).toFixed(3)}, {Number(place.lng).toFixed(3)} · {place.radius_mi} mi radius
+              </p>
+            </div>
+            <button onClick={() => setDrawerData(null)} className="text-gray-400 hover:text-white text-2xl font-bold">X</button>
+          </div>
+          <div className="px-4 py-3">
+            {drawerLoading && <p className="text-amber-200 text-center py-6 animate-pulse text-xl">Loading hazards...</p>}
+            {!drawerLoading && events.length === 0 && (
+              <div className="py-6 text-center">
+                <p className="text-3xl mb-2">✓</p>
+                <p className="text-white text-xl font-bold mb-1">No active hazards</p>
+                <p className="text-gray-400 text-base">Watching for new information.</p>
+              </div>
+            )}
+            {!drawerLoading && events.length > 0 && (
+              <div className="space-y-3">
+                {events.map(ev => {
+                  const sty = severityStyle(ev.severity);
+                  return (
+                    <div key={ev.id} className="rounded-xl overflow-hidden border" style={{ borderColor: sty.border, backgroundColor: sty.cardBg }}>
+                      <div className="px-3 py-2 flex items-center gap-2" style={{ backgroundColor: sty.headerBg }}>
+                        <span className="text-2xl">{hazardIcon(ev.hazard_type)}</span>
+                        <span className="text-white font-bold text-lg uppercase tracking-wide">{sty.label}</span>
+                        <span className="ml-auto text-amber-100 text-xs uppercase">{ev.source}</span>
+                      </div>
+                      <div className="px-3 py-2">
+                        <p className="text-white text-lg font-semibold leading-snug">{ev.title || 'Hazard event'}</p>
+                        {ev.description && <p className="text-gray-200 text-base mt-1 leading-snug">{ev.description}</p>}
+                        <div className="flex flex-wrap gap-2 mt-2 text-base text-gray-300">
+                          {ev.distance_mi != null && <span>📍 {formatDistance(ev.distance_mi)}</span>}
+                          {ev.occurred_at && <span>🕒 {formatRelativeTime(ev.occurred_at)}</span>}
+                        </div>
+                        {ev.url && (
+                          <a href={ev.url} target="_blank" rel="noopener noreferrer" className="text-amber-300 underline text-base mt-2 inline-block">More info →</a>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+          <div className="px-4 pb-4">
+            {place.id && !place.is_archived && (
+              <button onClick={async () => { await setPlaceArchived(place.id, true); setDrawerData(null); setPage('places'); }} className="w-full py-3 bg-amber-900/60 border border-amber-700 text-white rounded-xl text-xl font-semibold mb-2">
+                Move to My Places
+              </button>
+            )}
+            {place.id && place.is_archived && (
+              <button onClick={async () => { await setPlaceArchived(place.id, false); setDrawerData(null); setPage('watchlist'); }} className="w-full py-3 bg-amber-900/60 border border-amber-700 text-white rounded-xl text-xl font-semibold mb-2">
+                Resume Watching
+              </button>
+            )}
+            <p className="text-center text-gray-500 text-sm mt-2">
+              Sources: USGS · NWS · NASA EONET · GDACS
+            </p>
+            <button onClick={() => setDrawerData(null)} className="w-full py-4 bg-gray-800/60 border border-gray-700 text-white rounded-xl text-xl mt-2">Close</button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const PT = isPhone ? '41vh' : isTablet ? '36vh' : '34vh';
+  const cardClass = 'rounded-2xl p-4 shadow-2xl border border-amber-700/40 bg-gray-900/80 backdrop-blur-sm';
+  const iClass = 'w-full px-4 py-3 rounded-xl bg-white/10 border border-amber-700/40 text-white placeholder-white/50 focus:outline-none focus:ring-2 focus:ring-amber-500 text-xl';
+  const containerClass = (page === 'info') ? 'w-full max-w-3xl mx-auto px-3' : 'w-full px-3';
+  const unreadCount = notifications.length;
+
+  // ── Login page ──────────────────────────────────────────────────────────────
+
+  if (page === 'login') {
+    return (
+      <div style={{ minHeight: '100dvh', width: '100%', backgroundColor: POSTER_STYLE.backgroundColor, backgroundImage: 'url(' + EW_LOGIN_BG + ')', backgroundSize: POSTER_STYLE.backgroundSize, backgroundPosition: POSTER_STYLE.backgroundPosition, backgroundRepeat: POSTER_STYLE.backgroundRepeat, backgroundAttachment: POSTER_STYLE.backgroundAttachment, display: 'flex', flexDirection: 'column', alignItems: 'stretch', paddingBottom: '4rem' }}>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'flex-end', flex: '1 1 auto', minHeight: '50vh', paddingTop: '2rem', paddingBottom: '1.5rem' }}>
+          <h1 className="text-amber-300 font-black text-center tracking-tight" style={{ fontSize: isPhone ? '6rem' : '7rem', textShadow: '0 2px 14px rgba(0,0,0,0.95), 0 0 28px rgba(0,0,0,0.85)', marginTop: '1rem', lineHeight: '1' }}>Earth<br />Watch</h1>
+        </div>
+        <div style={{ paddingLeft: '1.5rem', paddingRight: '1.5rem', paddingBottom: '2rem' }}>
+          <div className="rounded-2xl p-4 shadow-2xl border border-amber-500/50 space-y-3" style={{ backgroundColor: 'rgba(28,25,23,0.85)', backdropFilter: 'blur(8px)' }}>
+            <input id="ew-login-email" type="email" name="ew-login-email" placeholder="Email address" value={email} onChange={(e) => setEmail(e.target.value)} onFocus={(e) => { setTimeout(() => { e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 350); }} onKeyPress={(e) => e.key === 'Enter' && doAuth('login')} autoComplete="email" autoCorrect="off" autoCapitalize="off" spellCheck="false" className="w-full px-4 py-3 rounded-xl bg-white/15 border border-white/30 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-amber-500 text-xl" />
+            <div className="relative">
+              <input id="ew-login-password" type={showPassword ? 'text' : 'password'} name="ew-login-password" placeholder="Password" value={password} onChange={(e) => setPassword(e.target.value)} onFocus={(e) => { setTimeout(() => { e.target.scrollIntoView({ behavior: 'smooth', block: 'center' }); }, 350); }} onKeyPress={(e) => e.key === 'Enter' && doAuth('login')} autoComplete="current-password" autoCorrect="off" autoCapitalize="off" spellCheck="false" className="w-full px-4 py-3 rounded-xl bg-white/15 border border-white/30 text-white placeholder-white/60 focus:outline-none focus:ring-2 focus:ring-amber-500 text-xl" />
+              <button onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-white/60">{showPassword ? <EyeOffIcon /> : <EyeIcon />}</button>
+            </div>
+            {backendWaking && <p className="text-white/60 text-xl text-center animate-pulse">Waking up the server...</p>}
+            <div className="grid grid-cols-2 gap-3">
+              <button onClick={() => doAuth('login')} disabled={loading} className="py-4 bg-amber-600 hover:bg-amber-700 text-white font-bold rounded-xl disabled:opacity-50 text-2xl">{loading ? '...' : 'Sign In'}</button>
+              <button onClick={() => doAuth('register')} disabled={loading} className="py-4 bg-amber-900/60 hover:bg-amber-800/80 text-white font-bold rounded-xl disabled:opacity-50 text-2xl border border-amber-400/60">{loading ? '...' : 'Register'}</button>
+            </div>
+            <p className="text-white/50 text-base text-center">You'll stay signed in automatically</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  const activePlaces = places.filter(p => !p.is_archived);
+  const archivedPlaces = places.filter(p => p.is_archived);
+
+  return (
+    <PageWrapper bgStyle={page === 'watchlist' || page === 'places' || page === 'alerts' ? WOOD_STYLE : POSTER_STYLE}>
+      <HazardDrawer />
+      <div className={containerClass}>
+
+        {/* ── Search / Add Place ─────────────────────────────────────────── */}
+        {page === 'search' && (() => {
+          var SEARCH_PT = isPhone ? '24vh' : isTablet ? '26vh' : '28vh';
+          return (
+          <div className="space-y-3" style={{ paddingTop: SEARCH_PT, paddingBottom: '7rem' }}>
+            <div className="flex flex-col items-center justify-end" style={{ minHeight: SEARCH_PT, marginTop: '-' + SEARCH_PT, paddingTop: '0.5rem', paddingBottom: '1rem', pointerEvents: 'none', overflow: 'visible' }}>
+              <p className="text-amber-300 font-bold italic text-center" style={{ fontSize: isPhone ? '3.5rem' : '4rem', textShadow: '0 2px 10px rgba(0,0,0,0.95), 0 0 20px rgba(0,0,0,0.8)', marginTop: '0.5rem', lineHeight: '1.05' }}>Watch<br />Your World</p>
+            </div>
+            <div className={cardClass} style={{ overflowY: 'auto', maxHeight: 'calc(100dvh - ' + SEARCH_PT + ' - 8rem)', backgroundColor: 'rgba(28,25,23,0.82)' }}>
+              <CardPageHeader title="Add a Place" subtitle="Watch hazards within a radius" />
+              <div className="space-y-3">
+                <ClearableInput value={newPlace.name} onChange={(e) => setNewPlace(Object.assign({}, newPlace, { name: e.target.value }))} onBlur={(e) => setNewPlace(Object.assign({}, newPlace, { name: smartTitleCase(e.target.value.trim()) }))} onKeyPress={(e) => e.key === 'Enter' && addPlace()} placeholder="Place name (e.g., My House)" inputClass={iClass} />
+                <div className="grid grid-cols-2 gap-3">
+                  <ClearableInput numeric value={newPlace.lat} onChange={(e) => setNewPlace(Object.assign({}, newPlace, { lat: e.target.value }))} onKeyPress={(e) => e.key === 'Enter' && addPlace()} placeholder="Latitude" inputClass={iClass} />
+                  <ClearableInput numeric value={newPlace.lng} onChange={(e) => setNewPlace(Object.assign({}, newPlace, { lng: e.target.value }))} onKeyPress={(e) => e.key === 'Enter' && addPlace()} placeholder="Longitude" inputClass={iClass} />
+                </div>
+                <div>
+                  <p className="text-amber-200 text-base mb-2 text-center">Radius</p>
+                  <div className="grid grid-cols-4 gap-2">
+                    {RADIUS_PRESETS.map(r => (
+                      <button key={r} onClick={() => setNewPlace(Object.assign({}, newPlace, { radius: r }))} className={'py-3 rounded-lg text-xl font-bold border ' + (newPlace.radius === r ? 'bg-amber-600 text-white border-amber-400' : 'bg-gray-800/60 text-amber-200 border-amber-900/40')}>
+                        {r} mi
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <button onClick={addPlace} className="w-full py-3 bg-amber-600 hover:bg-amber-700 text-white rounded-lg flex items-center justify-center gap-2 text-2xl font-bold">
+                  <PlusIcon /> Add to Watchlist
+                </button>
+                {addPlaceMsg && <p className="text-amber-300 text-center text-xl">{addPlaceMsg}</p>}
+                <p className="text-gray-300 text-base text-center leading-snug px-2 pt-2 border-t border-amber-900/30">
+                  Public hazard data from the U.S. Geological Survey, U.S. National Weather Service, NASA EONET, and GDACS.
+                </p>
+                <p className="text-gray-400 text-sm text-center leading-snug">
+                  Tip: Look up coordinates on Google Maps — right-click a spot, copy the lat/lng pair.
+                </p>
+              </div>
+            </div>
+          </div>
+          );
+        })()}
+
+        {/* ── Watchlist ──────────────────────────────────────────────────── */}
+        {page === 'watchlist' && (
+          <div className="space-y-3" style={{ paddingTop: activePlaces.length > 0 ? '1rem' : PT }}>
+            <div className={cardClass}>
+              <CardPageHeader title="Watchlist" subtitle="Tap a place to see active hazards" />
+              {activePlaces.length === 0 && (
+                <div className="py-6 text-center">
+                  <p className="text-gray-300 text-xl leading-relaxed mb-2">No places on your watchlist yet.</p>
+                  <p className="text-amber-300 text-xl font-medium">Use Search to add a place.</p>
+                </div>
+              )}
+            </div>
+            {activePlaces.length > 0 && (
+              <div className={cardClass + ' mt-3'}>
+                <h2 className="text-3xl font-bold mb-1 text-white text-center">Your Watchlist ({activePlaces.length})</h2>
+                <div className="space-y-2 mt-2">
+                  {activePlaces.map(p => (
+                    <div key={p.id} className="p-4 rounded-lg border bg-gray-800/50 border-amber-900/30">
+                      {editingId === p.id ? (
+                        <div className="space-y-2">
+                          <ClearableInput value={editingName} onChange={(e) => setEditingName(e.target.value)} placeholder="Place name" inputClass="w-full px-3 py-4 border border-amber-700 rounded-lg focus:ring-2 focus:ring-amber-500 text-2xl bg-gray-700 text-white placeholder-gray-400" />
+                          <div className="flex gap-2">
+                            <button onClick={async () => { await renamePlace(p.id, smartTitleCase(editingName)); setEditingId(null); setEditingName(''); }} className="flex-1 py-4 bg-amber-600 text-white rounded-lg text-2xl font-bold">Save</button>
+                            <button onClick={() => { setEditingId(null); setEditingName(''); }} className="flex-1 py-4 bg-gray-600 text-gray-200 rounded-lg text-2xl">Cancel</button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-between">
+                          <div className="flex-1 min-w-0">
+                            <button onClick={() => openPlaceDrawer(p)} className="text-left w-full">
+                              <h3 className="font-semibold text-2xl text-white hover:text-amber-300 underline decoration-dotted truncate">{p.name}</h3>
+                            </button>
+                            <p className="text-xl text-gray-400">{Number(p.lat).toFixed(3)}, {Number(p.lng).toFixed(3)} · {p.radius_mi} mi</p>
+                            <div className="flex items-center gap-1 mt-1"><CheckIcon /><span className="text-xl text-amber-400">Watching</span></div>
+                          </div>
+                          <div className="flex gap-2 ml-2 shrink-0">
+                            <button onClick={() => { setEditingId(p.id); setEditingName(p.name); }} className="p-2 text-amber-400 hover:bg-amber-900/30 rounded-lg"><EditIcon /></button>
+                            <button onClick={() => removePlace(p.id)} className="p-2 text-amber-500 hover:bg-amber-900/30 rounded-lg"><TrashIcon /></button>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ── My Places (archived) ───────────────────────────────────────── */}
+        {page === 'places' && (
+          <div className="space-y-3" style={{ paddingTop: '1rem' }}>
+            <div className={cardClass}>
+              <CardPageHeader title="My Places" subtitle="Saved places, not actively watched" />
+              {archivedPlaces.length === 0 ? (
+                <div className="text-center py-6">
+                  <p className="text-gray-300 text-xl leading-relaxed">Places you save here are kept for reference but won't trigger alerts.</p>
+                  <p className="text-gray-400 text-base mt-2">Move a watchlist place to My Places from its detail drawer.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {archivedPlaces.map(p => (
+                    <div key={p.id} className="p-4 bg-gray-900/70 rounded-lg border border-gray-600/50">
+                      <div className="flex items-center justify-between">
+                        <div className="flex-1 min-w-0">
+                          <button onClick={() => openPlaceDrawer(p)} className="text-left w-full">
+                            <h3 className="font-semibold text-2xl text-white underline decoration-dotted truncate">{p.name}</h3>
+                          </button>
+                          <span className="text-xl text-gray-400 font-bold">Saved</span>
+                          <p className="text-gray-500 text-lg">{Number(p.lat).toFixed(3)}, {Number(p.lng).toFixed(3)} · {p.radius_mi} mi</p>
+                        </div>
+                        <button onClick={() => removePlace(p.id)} className="p-2 text-amber-500 hover:bg-amber-900/30 rounded-lg ml-2 shrink-0"><TrashIcon /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Alerts feed ───────────────────────────────────────────────── */}
+        {page === 'alerts' && (
+          <div className="space-y-3" style={{ paddingTop: '1rem' }}>
+            <div className={cardClass}>
+              <CardPageHeader title="Alerts" subtitle="Latest hazards near your places" />
+              {notifications.length === 0 ? (
+                <div className="text-center py-4">
+                  <p className="text-white font-bold text-2xl">No alerts yet</p>
+                  <p className="text-gray-200 text-xl mt-1">We'll notify you when a hazard appears near a watched place.</p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {(() => {
+                    var groups = {};
+                    var order = [];
+                    for (var ni = 0; ni < notifications.length; ni++) {
+                      var n = notifications[ni];
+                      var key = n.watchlist_id || ('name:' + n.name);
+                      if (!groups[key]) { groups[key] = { name: n.name, watchlist_id: n.watchlist_id, items: [], latest: n.created_at }; order.push(key); }
+                      groups[key].items.push(n);
+                      if (n.created_at > groups[key].latest) groups[key].latest = n.created_at;
+                    }
+                    return order.map(function(k) {
+                      var g = groups[k];
+                      var firstId = g.items[0].id;
+                      var isExpanded = !!expandedAlertGroups[k];
+                      var visibleItems = isExpanded ? g.items : g.items.slice(0, 1);
+                      var moreCount = g.items.length - 1;
+                      return (
+                        <div key={k} className="p-3 bg-amber-950/50 border border-amber-800 rounded-xl">
+                          <h3 className="font-bold text-white text-2xl mb-1">{g.name || 'Place'}</h3>
+                          <ul className="mb-2 space-y-1">
+                            {visibleItems.map(function(item) {
+                              return <li key={item.id} className="text-gray-200 text-base leading-snug">• {item.message}</li>;
+                            })}
+                          </ul>
+                          {moreCount > 0 && (
+                            <button onClick={() => setExpandedAlertGroups(Object.assign({}, expandedAlertGroups, { [k]: !isExpanded }))} className="text-amber-300 text-base font-semibold underline decoration-dotted mb-2">
+                              {isExpanded ? 'Show less' : ('+ ' + moreCount + ' more ' + (moreCount === 1 ? 'alert' : 'alerts'))}
+                            </button>
+                          )}
+                          <p className="text-gray-400 text-sm mt-1 mb-2">{new Date(g.latest).toLocaleDateString()}</p>
+                          <div className="flex gap-2">
+                            <button onClick={() => {
+                              var watchedPlace = places.find(function(p) { return p.id === g.watchlist_id; });
+                              if (watchedPlace) openPlaceDrawer(watchedPlace);
+                            }} className="flex-1 py-2 bg-amber-700/50 border border-amber-600/50 text-white rounded-lg text-xl font-bold">View</button>
+                            <button onClick={async () => {
+                              for (var di = 0; di < g.items.length; di++) { try { await dismissAlert(g.items[di].id); } catch(e) {} }
+                            }} className="flex-1 py-2 bg-transparent border border-amber-900/50 text-amber-400 rounded-lg text-base">
+                              Dismiss<span className="block text-amber-600 text-xs leading-tight">Remove All</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* ── Info ───────────────────────────────────────────────────────── */}
+        {page === 'info' && (
+          <div className="space-y-4 pb-8" style={{ paddingTop: '1rem' }}>
+            <div className={cardClass}>
+              <div className="mb-3 pb-2 border-b border-amber-900/30 text-center">
+                <h2 className="text-4xl font-black text-white tracking-wide">About</h2>
+                <h2 className="text-4xl font-black text-white tracking-wide">EarthWatch</h2>
+              </div>
+              <p className="text-amber-300 italic text-xl text-center mb-3">v{APP_VERSION}</p>
+              <div className="flex items-center gap-4 mb-4">
+                <img src={BILL_PHOTO} alt="Bill Spencer" className="w-14 h-14 rounded-full object-cover border-2 border-amber-600 shadow-lg shrink-0" />
+                <div>
+                  <p className="font-bold text-white text-xl">Bill Spencer</p>
+                  <p className="text-amber-400 italic text-xl">Founder</p>
+                  <a href="mailto:hello@earthwatch.app" className="text-amber-400 text-xl mt-1 block">hello@earthwatch.app</a>
+                </div>
+              </div>
+              <p className="text-amber-200 text-2xl font-bold italic mb-3">Watch your world.</p>
+              <div className="space-y-3 text-gray-200 text-xl leading-relaxed">
+                <p>Places you live. Places you've been. Places you love.</p>
+                <p>"Check the news," they say. But hazard information is scattered across dozens of sources, and the things that matter most -- earthquakes, severe weather, fires, floods -- are buried until it's too late.</p>
+                <p>So we built EarthWatch to bring it all together: a simple way to follow the places you care about and get notified when something's happening nearby.</p>
+                <p>EarthWatch monitors public information from government and scientific sources. No ads. No subscriptions. Just useful answers.</p>
+              </div>
+            </div>
+            <div className={cardClass}>
+              <h3 className="text-white text-2xl font-bold mb-4 text-center">How it works</h3>
+              <div className="space-y-4">
+                <div className="flex gap-3 items-start"><span className="text-amber-400 text-2xl font-black w-7 shrink-0">1.</span><p className="text-gray-300 text-xl">Add a place by latitude and longitude, with a radius around it.</p></div>
+                <div className="flex gap-3 items-start"><span className="text-amber-400 text-2xl font-black w-7 shrink-0">2.</span><p className="text-gray-300 text-xl">EarthWatch checks public hazard feeds every hour and matches new events to your watched places.</p></div>
+                <div className="flex gap-3 items-start"><span className="text-amber-400 text-2xl font-black w-7 shrink-0">3.</span><p className="text-gray-300 text-xl">When something happens within your radius, you'll see an alert -- with the type, severity, and distance.</p></div>
+                <div className="flex gap-3 items-start"><span className="text-amber-400 text-2xl font-black w-7 shrink-0">4.</span><p className="text-gray-300 text-xl">EarthWatch is free. Premium features may include faster check intervals and custom hazard filters.</p></div>
+              </div>
+            </div>
+            <div className={cardClass}>
+              <h3 className="text-white text-2xl font-bold mb-3">Data Sources</h3>
+              <div className="space-y-2 text-gray-200 text-xl leading-relaxed">
+                <p><strong className="text-white">USGS</strong> -- Earthquakes worldwide.</p>
+                <p><strong className="text-white">NWS</strong> -- U.S. severe weather, including marine warnings.</p>
+                <p><strong className="text-white">NASA EONET</strong> -- Wildfires, volcanoes, storms, sea ice.</p>
+                <p><strong className="text-white">GDACS</strong> -- Global multi-hazard aggregator for non-U.S. coverage.</p>
+              </div>
+            </div>
+            <div className={cardClass}>
+              <h3 className="font-bold text-white mb-1 text-2xl">Privacy Policy</h3>
+              <p className="text-gray-400 text-xl mb-3">Last updated: April 2026</p>
+              <div className="space-y-3 text-gray-200 text-xl leading-relaxed">
+                <p><strong className="text-white">We collect:</strong> your email address, your watched places, and anonymous usage data.</p>
+                <p><strong className="text-white">How we use it:</strong> We do not sell your personal information. Ever.</p>
+                <p><strong className="text-white">Data sources:</strong> Hazard information is based on publicly available sources from USGS, NWS, NASA, and GDACS.</p>
+                <p><strong className="text-white">Your rights:</strong> You may delete your account and all associated data at any time.</p>
+                <p><strong className="text-white">Disclaimer:</strong> Hazard information is provided for informational purposes only. Always follow guidance from local authorities. EarthWatch is not a substitute for official emergency notifications.</p>
+                <a href="mailto:hello@earthwatch.app" className="text-amber-400 text-xl">hello@earthwatch.app</a>
+              </div>
+            </div>
+            <div className="px-1 space-y-3 pb-2">
+              <div className="p-3 bg-black/30 rounded-xl"><p className="font-medium text-gray-200 text-xl text-center">{user && user.email}</p></div>
+              <button onClick={doLogout} className="w-full py-4 bg-amber-700 hover:bg-amber-800 text-white rounded-xl text-2xl font-bold">Sign Out</button>
+              <button onClick={() => setShowDangerZone(!showDangerZone)} className="w-full py-3 text-gray-500 text-xl text-center">{showDangerZone ? 'Hide' : 'Account Removal'}</button>
+              {showDangerZone && (
+                <div className="space-y-3">
+                  {!showDeleteConfirm
+                    ? <button onClick={() => setShowDeleteConfirm(true)} className="w-full py-4 bg-gray-900/70 border border-amber-800 text-amber-400 rounded-xl text-xl">Delete Account</button>
+                    : <div className="bg-amber-950/90 border border-amber-800 rounded-2xl p-5 space-y-3">
+                        <h3 className="font-bold text-amber-400 text-xl">Are you sure?</h3>
+                        <p className="text-amber-300 text-xl">This will permanently delete your account and all data.</p>
+                        <button onClick={doDeleteAccount} className="w-full py-4 bg-amber-700 text-white rounded-xl font-bold text-xl">Yes, Permanently Delete My Account</button>
+                        <button onClick={() => { setShowDeleteConfirm(false); setShowDangerZone(false); }} className="w-full py-4 bg-gray-800 border border-gray-600 text-gray-300 rounded-xl font-medium text-xl">Cancel</button>
+                      </div>
+                  }
+                </div>
+              )}
+            </div>
+            <p className="text-white/30 text-center text-sm pb-4">v{APP_VERSION}</p>
+          </div>
+        )}
+
+      </div>
+
+      {/* ── Bottom nav ───────────────────────────────────────────────────── */}
+      <div style={{ position: 'fixed', bottom: 0, left: 0, right: 0, backgroundColor: 'rgba(10,10,10,0.95)', backdropFilter: 'blur(8px)', borderTop: '1px solid #92400e', padding: '0.5rem 1rem', paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}>
+        <div className="flex justify-around max-w-sm mx-auto">
+          <button onClick={() => setPage('search')} className={'flex flex-col items-center gap-0.5 px-1 py-1 ' + (page === 'search' ? 'text-amber-400' : 'text-gray-400')}>
+            <SearchIcon /><span className="text-xl font-medium">Search</span>
+          </button>
+          <button onClick={() => setPage('watchlist')} className={'flex flex-col items-center gap-0.5 px-1 py-1 ' + (page === 'watchlist' ? 'text-amber-400' : 'text-gray-400')}>
+            <HeartIcon /><span className="text-xl font-medium">Watchlist</span>
+          </button>
+          <button onClick={() => setPage('places')} className={'flex flex-col items-center gap-0.5 px-1 py-1 ' + (page === 'places' ? 'text-amber-400' : 'text-gray-400')}>
+            <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+            <span className="text-xl font-medium">My Places</span>
+          </button>
+          <button onClick={() => setPage('alerts')} className={'flex flex-col items-center gap-0.5 px-1 py-1 relative ' + (page === 'alerts' ? 'text-amber-400' : 'text-gray-400')}>
+            <BellIcon red={unreadCount > 0} />
+            {unreadCount > 0 && <span className="absolute top-0 right-1 bg-amber-600 text-white text-xl font-bold rounded-full w-4 h-4 flex items-center justify-center">{unreadCount > 9 ? '9+' : unreadCount}</span>}
+            <span className="text-xl font-medium" style={unreadCount > 0 ? {color:'#d97706'} : {}}>Alerts</span>
+          </button>
+          <button onClick={() => setPage('info')} className={'flex flex-col items-center gap-0.5 px-1 py-1 ' + (page === 'info' ? 'text-amber-400' : 'text-gray-400')}>
+            <InfoIcon /><span className="text-xl font-medium">Info</span>
+          </button>
+        </div>
+        <p className="text-center text-gray-600 text-xs mt-1" style={{display: page === 'search' ? 'none' : 'block'}}>app v{APP_VERSION} | api v{apiVersion}</p>
+      </div>
+    </PageWrapper>
+  );
+}
+
+ReactDOM.render(React.createElement(App), document.getElementById('root'));
+</script>
+</body>
+</html>
