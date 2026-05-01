@@ -52,7 +52,7 @@ const API_BASE = 'https://earthwatch-backend.onrender.com';
 const EW_BG = 'https://raw.githubusercontent.com/bspencer413/earthwatch-frontend/main/earthrise_bg.jpg';
 const EW_LOGIN_BG = 'https://raw.githubusercontent.com/bspencer413/earthwatch-frontend/main/earthrise_bg.jpg';
 const BILL_PHOTO = 'https://raw.githubusercontent.com/bspencer413/memorial-watch/main/Bill.jpeg';
-const APP_VERSION = '0.1.5';
+const APP_VERSION = '0.1.6';
 
 // === CW LEGACY (commented for EW) ============================================
 // FLEET_DATA, RISK_INDICATORS, findCruiseLineKey, editDistance, findShipSuggestion,
@@ -414,25 +414,25 @@ function App() {
     }
   };
 
-  const setPlaceArchived = async (id, archived) => {
+  const setPlaceInMyPlaces = async (id, saved) => {
+    // v0.1.6: toggles the in_my_places flag. Never removes the place from
+    // Watchlist — Watchlist contains ALL places and is the live monitor.
     var token = localStorage.getItem('ew_token');
     try {
       var r = await fetch(API_BASE + '/ew/places/' + id, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({ is_archived: archived })
+        body: JSON.stringify({ in_my_places: saved })
       });
       if (r.ok) {
-        // Functional setState: always uses the freshest places state, never a
-        // stale closure capture. v0.1.4: hardens the v0.1.3 fix.
         setPlaces(function(prev) {
           return prev.map(function(p) {
-            if (p.id === id) return Object.assign({}, p, { is_archived: archived });
+            if (p.id === id) return Object.assign({}, p, { in_my_places: saved });
             return p;
           });
         });
       }
-    } catch(e) { console.error('archive failed:', e); }
+    } catch(e) { console.error('save to my places failed:', e); }
   };
 
   const renamePlace = async (id, name) => {
@@ -539,27 +539,30 @@ function App() {
             )}
           </div>
           <div className="px-4 pb-4">
-            {place.id && !place.is_archived && (() => {
-              // Dup-check: is there already a row with the same name (case-insensitive)
-              // sitting in My Places? If yes, show "Already in My Places" instead of
-              // a Save button so the user doesn't double-save.
+            {place.id && !place.in_my_places && (() => {
+              // Dup-check: same name (case-insensitive) already saved in My Places?
               var dup = places.some(function(p) {
-                return p.is_archived && p.name && place.name &&
+                return p.in_my_places && p.id !== place.id && p.name && place.name &&
                        p.name.toLowerCase().trim() === place.name.toLowerCase().trim();
               });
               if (dup) {
                 return (
                   <div className="w-full py-3 bg-slate-800/40 border border-slate-600/40 text-gray-100 rounded-xl text-lg text-center mb-2">
-                    Already saved in My Places
+                    Already in My Places (same name)
                   </div>
                 );
               }
               return (
-                <button onClick={async () => { await setPlaceArchived(place.id, true); setDrawerData(null); setPage('places'); }} className="w-full py-3 bg-teal-700 hover:bg-teal-800 border border-teal-500 text-white rounded-xl text-xl font-semibold mb-2">
+                <button onClick={async () => { await setPlaceInMyPlaces(place.id, true); setDrawerData(Object.assign({}, drawerData, { place: Object.assign({}, place, { in_my_places: true }) })); }} className="w-full py-3 bg-teal-700 hover:bg-teal-800 border border-teal-500 text-white rounded-xl text-xl font-semibold mb-2">
                   Save to My Places
                 </button>
               );
             })()}
+            {place.id && place.in_my_places && (
+              <div className="w-full py-3 bg-slate-800/40 border border-slate-600/40 text-gray-100 rounded-xl text-lg text-center mb-2">
+                Saved to My Places
+              </div>
+            )}
             <p className="text-center text-gray-100 text-base mt-2">
               Sources: USGS · NWS
             </p>
@@ -603,8 +606,13 @@ function App() {
     );
   }
 
-  const activePlaces = places.filter(p => !p.is_archived);
-  const archivedPlaces = places.filter(p => p.is_archived);
+  // v0.1.6 model:
+  //   - Watchlist = ALL places (cron monitors them all, drawer does live recheck)
+  //   - My Places = subset with in_my_places=true (additional saved-for-reference flag)
+  //   - A place lives in BOTH simultaneously when saved to My Places.
+  //   - is_archived is legacy and ignored at the UI level (backend migrated it).
+  var activePlaces = places;
+  var archivedPlaces = places.filter(function(p) { return p.in_my_places; });
 
   return (
     <PageWrapper bgStyle={page === 'watchlist' || page === 'places' || page === 'alerts' ? WOOD_STYLE : POSTER_STYLE}>
@@ -690,18 +698,8 @@ function App() {
               <CardPageHeader title="Watchlist" subtitle="Tap a place to see active Earth events" />
               {activePlaces.length === 0 && (
                 <div className="py-6 text-center">
-                  {archivedPlaces.length === 0 ? (
-                    <span>
-                      <p className="text-gray-100 text-xl leading-relaxed mb-2">No places on your watchlist yet.</p>
-                      <p className="text-teal-300 text-xl font-medium">Use Search to add a place.</p>
-                    </span>
-                  ) : (
-                    <span>
-                      <p className="text-gray-100 text-xl leading-relaxed mb-2">No places being watched right now.</p>
-                      <p className="text-gray-200 text-lg leading-snug mb-2">You have {archivedPlaces.length} place{archivedPlaces.length === 1 ? '' : 's'} saved in My Places.</p>
-                      <p className="text-teal-300 text-lg font-medium">Tap one there to resume watching, or use Search to add a new place.</p>
-                    </span>
-                  )}
+                  <p className="text-gray-100 text-xl leading-relaxed mb-2">No places yet.</p>
+                  <p className="text-teal-300 text-xl font-medium">Use Search to add a place.</p>
                 </div>
               )}
             </div>
@@ -746,11 +744,11 @@ function App() {
         {page === 'places' && (
           <div className="space-y-3" style={{ paddingTop: '1rem' }}>
             <div className={cardClass}>
-              <CardPageHeader title="My Places" subtitle="Saved places, not actively watched" />
+              <CardPageHeader title="My Places" subtitle="Your saved collection — also being watched" />
               {archivedPlaces.length === 0 ? (
                 <div className="text-center py-6">
-                  <p className="text-gray-100 text-xl leading-relaxed">Places you save here are kept for reference but won't trigger alerts.</p>
-                  <p className="text-gray-200 text-base mt-2">Move a watchlist place to My Places from its detail drawer.</p>
+                  <p className="text-gray-100 text-xl leading-relaxed">Saved places appear here for quick reference.</p>
+                  <p className="text-gray-200 text-base mt-2">They also stay on your Watchlist for monitoring. Tap "Save to My Places" inside any drawer.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
