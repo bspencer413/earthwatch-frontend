@@ -52,7 +52,7 @@ const API_BASE = 'https://earthwatch-backend.onrender.com';
 const EW_BG = 'https://raw.githubusercontent.com/bspencer413/earthwatch-frontend/main/earthrise_bg.jpg';
 const EW_LOGIN_BG = 'https://raw.githubusercontent.com/bspencer413/earthwatch-frontend/main/earthrise_bg.jpg';
 const BILL_PHOTO = 'https://raw.githubusercontent.com/bspencer413/memorial-watch/main/Bill.jpeg';
-const APP_VERSION = '0.1.1';
+const APP_VERSION = '0.1.2';
 
 // === CW LEGACY (commented for EW) ============================================
 // FLEET_DATA, RISK_INDICATORS, findCruiseLineKey, editDistance, findShipSuggestion,
@@ -582,19 +582,24 @@ function App() {
 
         {/* ── Search / Add Place ─────────────────────────────────────────── */}
         {page === 'search' && (() => {
-          var SEARCH_PT = isPhone ? '24vh' : isTablet ? '26vh' : '28vh';
+          var SEARCH_PT = isPhone ? '15vh' : isTablet ? '18vh' : '20vh';
           return (
-          <div className="space-y-3" style={{ paddingTop: SEARCH_PT, paddingBottom: '7rem' }}>
-            <div className="flex flex-col items-center justify-end" style={{ minHeight: SEARCH_PT, marginTop: '-' + SEARCH_PT, paddingTop: '0.5rem', paddingBottom: '1rem', pointerEvents: 'none', overflow: 'visible' }}>
-              <p className="text-teal-300 font-bold italic text-center" style={{ fontSize: isPhone ? '3.5rem' : '4rem', textShadow: '0 2px 10px rgba(0,0,0,0.95), 0 0 20px rgba(0,0,0,0.8)', marginTop: '0.5rem', lineHeight: '1.05' }}>Watch<br />Your World</p>
+          <div className="space-y-3" style={{ paddingTop: SEARCH_PT, paddingBottom: '6rem' }}>
+            <div className="flex flex-col items-center justify-end" style={{ minHeight: SEARCH_PT, marginTop: '-' + SEARCH_PT, paddingTop: '0.5rem', paddingBottom: '0.75rem', pointerEvents: 'none', overflow: 'visible' }}>
+              <p className="text-teal-300 font-bold italic text-center" style={{ fontSize: isPhone ? '2.5rem' : '3rem', textShadow: '0 2px 10px rgba(0,0,0,0.95), 0 0 20px rgba(0,0,0,0.8)', marginTop: '0.25rem', lineHeight: '1.05' }}>Watch<br />Your World</p>
             </div>
-            <div className={cardClass} style={{ overflowY: 'auto', maxHeight: 'calc(100dvh - ' + SEARCH_PT + ' - 8rem)', backgroundColor: 'rgba(15,23,42,0.85)' }}>
+            <div className={cardClass} style={{ overflowY: 'auto', maxHeight: 'calc(100dvh - ' + SEARCH_PT + ' - 7rem)', backgroundColor: 'rgba(15,23,42,0.85)' }}>
               <CardPageHeader title="Add a Place" subtitle="Watch hazards within a radius" />
               <div className="space-y-3">
-                <ClearableInput value={geoQuery} onChange={(e) => { setGeoQuery(e.target.value); setGeoPicked(null); }} onKeyPress={(e) => e.key === 'Enter' && doGeocode()} placeholder="City, address, or landmark" inputClass={iClass} />
+                <ClearableInput value={geoQuery} onChange={(e) => { setGeoQuery(e.target.value); setGeoPicked(null); }} onKeyPress={(e) => e.key === 'Enter' && doGeocode()} placeholder="Hilo, Hawaii · Eiffel Tower · 21.3, -157.8" inputClass={iClass} />
                 <button onClick={doGeocode} disabled={geoSearching} className="w-full py-3 bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white rounded-lg flex items-center justify-center gap-2 text-xl font-bold">
                   {geoSearching ? 'Searching…' : 'Search'}
                 </button>
+                <p className="text-gray-300 text-sm text-center leading-snug">
+                  City, neighborhood, address, landmark, or coordinates — we're forgiving.
+                  {' '}
+                  <button onClick={() => setPage('info')} className="text-teal-300 underline decoration-dotted">Your address is safe.</button>
+                </p>
                 {geoMsg && <p className="text-teal-300 text-center text-base">{geoMsg}</p>}
                 {geoCandidates.length > 0 && (
                   <div className="space-y-2 mt-1">
@@ -830,6 +835,7 @@ function App() {
               <p className="text-gray-400 text-xl mb-3">Last updated: April 2026</p>
               <div className="space-y-3 text-gray-200 text-xl leading-relaxed">
                 <p><strong className="text-white">We collect:</strong> your email address, your watched places, and anonymous usage data.</p>
+                <p><strong className="text-white">Addresses are safe:</strong> When you search for a place, we send the address you typed to Google's geocoding service to convert it to coordinates. We don't store your address — only the resulting latitude/longitude and the name you give the place.</p>
                 <p><strong className="text-white">How we use it:</strong> We do not sell your personal information. Ever.</p>
                 <p><strong className="text-white">Data sources:</strong> Hazard information is based on publicly available sources from USGS, NWS, NASA, and GDACS.</p>
                 <p><strong className="text-white">Your rights:</strong> You may delete your account and all associated data at any time.</p>
