@@ -8,18 +8,18 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="EarthWatch">
   <title>EarthWatch</title>
-  <meta name="description" content="EarthWatch — Stay informed about hazards affecting places you care about. Earthquakes, severe weather, fires, volcanoes. Anywhere in the world. Free.">
+  <meta name="description" content="EarthWatch — Stay informed about Earth events affecting places you care about. Earthquakes, severe weather, fires, volcanoes. Anywhere in the world. Free.">
   <meta name="keywords" content="earthwatch, hazard alerts, earthquake alerts, weather alerts, fire alerts, volcano alerts">
   <meta name="robots" content="index, follow">
   <meta name="author" content="EarthWatch">
   <link rel="canonical" href="https://earthwatch.app">
-  <meta property="og:title" content="EarthWatch — Hazards near places you care about">
+  <meta property="og:title" content="EarthWatch — Earth Events near places you care about">
   <meta property="og:description" content="Add places to your watchlist. Get notified about earthquakes, severe weather, fires, and more.">
   <meta property="og:url" content="https://earthwatch.app">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="EarthWatch — Hazards near places you care about">
-  <meta name="twitter:description" content="Add places to your watchlist. Get notified about hazards.">
+  <meta name="twitter:title" content="EarthWatch — Earth Events near places you care about">
+  <meta name="twitter:description" content="Add places to your watchlist. Get notified about Earth events.">
   <link rel="manifest" href="data:application/json;base64,eyJuYW1lIjogIkVhcnRoV2F0Y2giLCAic2hvcnRfbmFtZSI6ICJFVyIsICJzdGFydF91cmwiOiAiLyIsICJkaXNwbGF5IjogInN0YW5kYWxvbmUiLCAiYmFja2dyb3VuZF9jb2xvciI6ICIjMGEwYTBhIiwgInRoZW1lX2NvbG9yIjogIiMwZDk0ODgifQ==">
   <link rel="apple-touch-icon" href="https://raw.githubusercontent.com/bspencer413/earthwatch-frontend/main/ew_icon.png">
   <script src="https://cdn.tailwindcss.com"></script>
@@ -493,7 +493,7 @@ function App() {
             <button onClick={() => setDrawerData(null)} className="text-gray-200 hover:text-white text-2xl font-bold">X</button>
           </div>
           <div className="px-4 py-3">
-            {drawerLoading && <p className="text-teal-200 text-center py-6 animate-pulse text-xl">Loading hazards...</p>}
+            {drawerLoading && <p className="text-teal-200 text-center py-6 animate-pulse text-xl">Loading Earth events...</p>}
             {!drawerLoading && drawerData && drawerData.static_map_url && (
               <button onClick={() => setMapEnlarged(true)} className="block w-full mb-3 rounded-xl overflow-hidden border border-slate-700/50">
                 <img src={drawerData.static_map_url} alt="" style={{ width: '100%', display: 'block' }} loading="lazy" />
@@ -503,7 +503,7 @@ function App() {
             {!drawerLoading && events.length === 0 && (
               <div className="py-6 text-center">
                 <p className="text-3xl mb-2">✓</p>
-                <p className="text-white text-2xl font-bold mb-1">No active hazards</p>
+                <p className="text-white text-2xl font-bold mb-1">No active Earth events</p>
                 <p className="text-gray-100 text-lg">Watching for new information.</p>
               </div>
             )}
@@ -519,7 +519,7 @@ function App() {
                         <span className="ml-auto text-white/80 text-xs uppercase">{ev.source}</span>
                       </div>
                       <div className="px-3 py-2">
-                        <p className="text-white text-lg font-semibold leading-snug">{ev.title || 'Hazard event'}</p>
+                        <p className="text-white text-lg font-semibold leading-snug">{ev.title || 'Earth event'}</p>
                         {ev.description && <p className="text-gray-200 text-base mt-1 leading-snug">{ev.description}</p>}
                         <div className="flex flex-wrap gap-2 mt-2 text-base text-gray-100">
                           {ev.distance_mi != null && <span>📍 {formatDistance(ev.distance_mi)}</span>}
@@ -615,7 +615,7 @@ function App() {
               <p className="text-teal-300 font-bold italic text-center" style={{ fontSize: isPhone ? '2.5rem' : '3rem', textShadow: '0 2px 10px rgba(0,0,0,0.95), 0 0 20px rgba(0,0,0,0.8)', marginTop: '0.25rem', lineHeight: '1.05' }}>Watch<br />Your World</p>
             </div>
             <div className={cardClass} style={{ overflowY: 'auto', maxHeight: 'calc(100dvh - ' + SEARCH_PT + ' - 7rem)', backgroundColor: 'rgba(15,23,42,0.85)' }}>
-              <CardPageHeader title="Add a Place" subtitle="Watch hazards within a radius" />
+              <CardPageHeader title="Add a Place" subtitle="Get Earth Alerts Near You" />
               <div className="space-y-3">
                 <ClearableInput value={geoQuery} onChange={(e) => { setGeoQuery(e.target.value); setGeoPicked(null); }} onKeyPress={(e) => e.key === 'Enter' && doGeocode()} placeholder="Hilo, Hawaii · Eiffel Tower · 21.3, -157.8" inputClass={iClass} />
                 <button onClick={doGeocode} disabled={geoSearching} className="w-full py-3 bg-teal-600 hover:bg-teal-700 disabled:opacity-60 text-white rounded-lg flex items-center justify-center gap-2 text-xl font-bold">
@@ -673,7 +673,7 @@ function App() {
         {page === 'watchlist' && (
           <div className="space-y-3" style={{ paddingTop: activePlaces.length > 0 ? '1rem' : PT }}>
             <div className={cardClass}>
-              <CardPageHeader title="Watchlist" subtitle="Tap a place to see active hazards" />
+              <CardPageHeader title="Watchlist" subtitle="Tap a place to see active Earth events" />
               {activePlaces.length === 0 && (
                 <div className="py-6 text-center">
                   {archivedPlaces.length === 0 ? (
@@ -764,11 +764,11 @@ function App() {
         {page === 'alerts' && (
           <div className="space-y-3" style={{ paddingTop: '1rem' }}>
             <div className={cardClass}>
-              <CardPageHeader title="Alerts" subtitle="Latest hazards near your places" />
+              <CardPageHeader title="Alerts" subtitle="Latest Earth events near your places" />
               {notifications.length === 0 ? (
                 <div className="text-center py-4">
                   <p className="text-white font-bold text-2xl">No alerts yet</p>
-                  <p className="text-gray-200 text-xl mt-1">We'll notify you when a hazard appears near a watched place.</p>
+                  <p className="text-gray-200 text-xl mt-1">We'll notify you when an Earth event appears near a watched place.</p>
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -843,7 +843,7 @@ function App() {
               <p className="text-teal-200 text-2xl font-bold italic mb-3">Watch your world.</p>
               <div className="space-y-3 text-gray-200 text-xl leading-relaxed">
                 <p>Places you live. Places you've been. Places you love.</p>
-                <p>"Check the news," they say. But hazard information is scattered across dozens of sources, and the things that matter most -- earthquakes, severe weather, fires, floods -- are buried until it's too late.</p>
+                <p>"Check the news," they say. But information about Earth events is scattered across dozens of sources, and the things that matter most -- earthquakes, severe weather, fires, floods -- are buried until it's too late.</p>
                 <p>So we built EarthWatch to bring it all together: a simple way to follow the places you care about and get notified when something's happening nearby.</p>
                 <p>EarthWatch monitors public information from government and scientific sources. No ads. No subscriptions. Just useful answers.</p>
               </div>
@@ -852,9 +852,9 @@ function App() {
               <h3 className="text-white text-2xl font-bold mb-4 text-center">How it works</h3>
               <div className="space-y-4">
                 <div className="flex gap-3 items-start"><span className="text-teal-400 text-2xl font-black w-7 shrink-0">1.</span><p className="text-gray-100 text-xl">Add a place by latitude and longitude, with a radius around it.</p></div>
-                <div className="flex gap-3 items-start"><span className="text-teal-400 text-2xl font-black w-7 shrink-0">2.</span><p className="text-gray-100 text-xl">EarthWatch checks public hazard feeds every 12 hours and matches new events to your watched places. Premium users will get faster checks.</p></div>
+                <div className="flex gap-3 items-start"><span className="text-teal-400 text-2xl font-black w-7 shrink-0">2.</span><p className="text-gray-100 text-xl">EarthWatch checks public Earth-event feeds every 12 hours and matches new events to your watched places. Premium users will get faster checks.</p></div>
                 <div className="flex gap-3 items-start"><span className="text-teal-400 text-2xl font-black w-7 shrink-0">3.</span><p className="text-gray-100 text-xl">When something happens within your radius, you'll see an alert -- with the type, severity, and distance.</p></div>
-                <div className="flex gap-3 items-start"><span className="text-teal-400 text-2xl font-black w-7 shrink-0">4.</span><p className="text-gray-100 text-xl">EarthWatch is free. Premium features may include faster check intervals and custom hazard filters.</p></div>
+                <div className="flex gap-3 items-start"><span className="text-teal-400 text-2xl font-black w-7 shrink-0">4.</span><p className="text-gray-100 text-xl">EarthWatch is free. Premium features may include faster check intervals and custom event filters.</p></div>
               </div>
             </div>
             <div className={cardClass}>
@@ -871,9 +871,9 @@ function App() {
                 <p><strong className="text-white">We collect:</strong> your email address, your watched places, and anonymous usage data.</p>
                 <p><strong className="text-white">Addresses are safe:</strong> When you search for a place, we send the address you typed to Google's geocoding service to convert it to coordinates. We don't store your address — only the resulting latitude/longitude and the name you give the place.</p>
                 <p><strong className="text-white">How we use it:</strong> We do not sell your personal information. Ever.</p>
-                <p><strong className="text-white">Data sources:</strong> Hazard information is based on publicly available sources from USGS and NWS.</p>
+                <p><strong className="text-white">Data sources:</strong> Earth event information is based on publicly available sources from USGS and NWS.</p>
                 <p><strong className="text-white">Your rights:</strong> You may delete your account and all associated data at any time.</p>
-                <p><strong className="text-white">Disclaimer:</strong> Hazard information is provided for informational purposes only. Always follow guidance from local authorities. EarthWatch is not a substitute for official emergency notifications.</p>
+                <p><strong className="text-white">Disclaimer:</strong> Earth event information is provided for informational purposes only. Always follow guidance from local authorities. EarthWatch is not a substitute for official emergency notifications.</p>
                 <a href="mailto:hello@earthwatch.app" className="text-teal-400 text-xl">hello@earthwatch.app</a>
               </div>
             </div>
@@ -914,13 +914,13 @@ function App() {
             <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
             <span className="text-xl font-medium">My Places</span>
           </button>
+          <button onClick={() => setPage('info')} className={'flex flex-col items-center gap-0.5 px-1 py-1 ' + (page === 'info' ? 'text-teal-400' : 'text-gray-200')}>
+            <InfoIcon /><span className="text-xl font-medium">Info</span>
+          </button>
           <button onClick={() => setPage('alerts')} className={'flex flex-col items-center gap-0.5 px-1 py-1 relative ' + (page === 'alerts' ? 'text-teal-400' : 'text-gray-200')}>
             <BellIcon red={unreadCount > 0} />
             {unreadCount > 0 && <span className="absolute top-0 right-1 bg-teal-600 text-white text-xl font-bold rounded-full w-4 h-4 flex items-center justify-center">{unreadCount > 9 ? '9+' : unreadCount}</span>}
             <span className="text-xl font-medium" style={unreadCount > 0 ? {color:'#0d9488'} : {}}>Alerts</span>
-          </button>
-          <button onClick={() => setPage('info')} className={'flex flex-col items-center gap-0.5 px-1 py-1 ' + (page === 'info' ? 'text-teal-400' : 'text-gray-200')}>
-            <InfoIcon /><span className="text-xl font-medium">Info</span>
           </button>
         </div>
         <p className="text-center text-gray-600 text-xs mt-1" style={{display: page === 'search' ? 'none' : 'block'}}>app v{APP_VERSION} | api v{apiVersion}</p>
