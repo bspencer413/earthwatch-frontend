@@ -53,7 +53,7 @@ const API_BASE = 'https://earthwatch-backend.onrender.com';
 const EW_BG = 'https://raw.githubusercontent.com/bspencer413/earthwatch-frontend/main/earthrise_bg.jpg';
 const EW_LOGIN_BG = 'https://raw.githubusercontent.com/bspencer413/earthwatch-frontend/main/earthrise_bg.jpg';
 const BILL_PHOTO = 'https://raw.githubusercontent.com/bspencer413/memorial-watch/main/Bill.jpeg';
-const APP_VERSION = '0.1.7';
+const APP_VERSION = '0.1.8';
 
 // === CW LEGACY (commented for EW) ============================================
 // FLEET_DATA, RISK_INDICATORS, findCruiseLineKey, editDistance, findShipSuggestion,
@@ -93,6 +93,23 @@ const hazardIcon = (type) => {
   if (type === 'tsunami') return '🌊';
   if (type === 'winter_storm' || type === 'ice') return '❄️';
   return '⚠️';
+};
+
+// Hazard type → human-readable label. v0.1.8: card headers now show this text
+// alongside the icon so an earthquake reads "EARTHQUAKE · MINOR" not just "🌐 MINOR"
+// (the globe icon isn't an obvious earthquake signal).
+const hazardLabel = (type) => {
+  if (type === 'earthquake') return 'Earthquake';
+  if (type === 'severe_weather' || type === 'storm') return 'Severe Weather';
+  if (type === 'tornado') return 'Tornado';
+  if (type === 'hurricane') return 'Hurricane';
+  if (type === 'tropical_cyclone') return 'Tropical Cyclone';
+  if (type === 'wildfire' || type === 'fire') return 'Wildfire';
+  if (type === 'volcano') return 'Volcano';
+  if (type === 'flood') return 'Flood';
+  if (type === 'tsunami') return 'Tsunami';
+  if (type === 'winter_storm' || type === 'ice') return 'Winter Storm';
+  return 'Earth Event';
 };
 
 // Severity → color + label. Maps the four-bucket severity from the backend
@@ -517,9 +534,11 @@ function App() {
                   const sty = severityStyle(ev.severity);
                   return (
                     <div key={ev.id} className="rounded-xl overflow-hidden border" style={{ borderColor: sty.border, backgroundColor: sty.cardBg }}>
-                      <div className="px-3 py-2 flex items-center gap-2" style={{ backgroundColor: sty.headerBg }}>
+                      <div className="px-3 py-2 flex items-center gap-2 flex-wrap" style={{ backgroundColor: sty.headerBg }}>
                         <span className="text-2xl">{hazardIcon(ev.hazard_type)}</span>
-                        <span className="text-white font-bold text-lg uppercase tracking-wide">{sty.label}</span>
+                        <span className="text-white font-bold text-lg uppercase tracking-wide">{hazardLabel(ev.hazard_type)}</span>
+                        <span className="text-white/60 text-base">·</span>
+                        <span className="text-white/90 font-semibold text-base uppercase">{sty.label}</span>
                         <span className="ml-auto text-white/80 text-xs uppercase">{ev.source}</span>
                       </div>
                       <div className="px-3 py-2">
