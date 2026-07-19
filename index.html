@@ -53,7 +53,7 @@ const API_BASE = 'https://earthwatch-backend.onrender.com';
 const EW_BG = 'https://raw.githubusercontent.com/bspencer413/earthwatch-frontend/main/earthrise_bg.jpg';
 const EW_LOGIN_BG = 'https://raw.githubusercontent.com/bspencer413/earthwatch-frontend/main/earthrise_bg.jpg';
 const BILL_PHOTO = 'https://raw.githubusercontent.com/bspencer413/memorial-watch/main/Bill.jpeg';
-const APP_VERSION = '0.1.10';
+const APP_VERSION = '0.1.11';
 
 // === CW LEGACY (commented for EW) ============================================
 // FLEET_DATA, RISK_INDICATORS, findCruiseLineKey, editDistance, findShipSuggestion,
@@ -218,7 +218,7 @@ const PageWrapper = ({ children, bgStyle }) => {
   );
 };
 // ============================================================================
-// AuthGate v0.3.3 — 3Brains portable account + anonymous-storage component
+// AuthGate v0.3.4 — 3Brains portable account + anonymous-storage component
 // ============================================================================
 //
 // PURPOSE
@@ -283,6 +283,14 @@ const AUTH_GATE_CONFIG = {
   loginEndpoint: '/auth/login',
   registerEndpoint: '/auth/register',
   freeAnonLimit: 5,
+  promoteField: 'in_my_places',                    // v0.3.4: field marking an item as "in My-X"
+  serverPromote: function(id, saved, token) {      // v0.3.4: promote/unpromote a SERVER item
+    return fetch(API_BASE + '/ew/places/' + id, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
+      body: JSON.stringify({ in_my_places: saved })
+    });
+  },
   appName: 'EarthWatch',
   saveActionLabel: 'save this place',
   itemNoun: 'places',
@@ -436,6 +444,15 @@ function useAuthGate(config) {
         const payload = Object.assign({}, anonItem);
         delete payload.id;
         const created = await serverAdd(payload);
+        // v0.3.4: re-apply promotion. If this anon item was promoted to My-X
+        // locally, promote the new server record so signup lands a populated
+        // My-X, not just Watchlist.
+        try {
+          if (config.promoteField && anonItem[config.promoteField]
+              && typeof config.serverPromote === 'function') {
+            await config.serverPromote(created.id, true, readToken());
+          }
+        } catch (e) {}
         // Remap snapshot key if it exists under the temp anon ID
         try {
           const oldKey = config.anonSnapshotPrefix + anonItem.id;
@@ -543,6 +560,30 @@ function useAuthGate(config) {
     setPendingAction({ type: 'callback', fn: callback });
     openSignup('Sign up to ' + config.saveActionLabel + '.');
     return false;
+  };
+
+  // -- Public: promote/unpromote an item to/from My-X (v0.3.4).
+  //    Anon: flag the item locally (config.promoteField) so it appears in My-X
+  //    and carries the flag into migration. Signed in: call config.serverPromote.
+  const promote = async (id, saved) => {
+    const val = (saved === undefined) ? true : saved;
+    if (isAuthed) {
+      if (typeof config.serverPromote === 'function') {
+        const r = await config.serverPromote(id, val, readToken());
+        if (r && r.ok) await refreshList();
+      }
+      return;
+    }
+    if (!config.promoteField) return;
+    const current = readAnonList();
+    const updated = current.map(function(it) {
+      if (it.id !== id) return it;
+      const c = Object.assign({}, it);
+      c[config.promoteField] = val;
+      return c;
+    });
+    writeAnonList(updated);
+    setList(updated);
   };
 
   // -- Modal submit (calls login or register against backend)
@@ -794,6 +835,7 @@ function useAuthGate(config) {
     remove: remove,
     refreshList: refreshList,
     getToken: readToken,               // v0.3.2: host token reads route here (dual-storage safe)
+    promote: promote,                  // v0.3.4: anon-local + server, migration-aware
     requireAuth: requireAuth,
     openSignup: openSignup,
     openSignin: openSignin,
@@ -804,7 +846,7 @@ function useAuthGate(config) {
   };
 }
 
-// === END AuthGate v0.3.3 ======================================================
+// === END AuthGate v0.3.4 ======================================================
 
 
 function App() {
@@ -968,17 +1010,9 @@ function App() {
   };
 
   const setPlaceInMyPlaces = async (id, saved) => {
-    // v0.1.6: toggles the in_my_places flag. Never removes the place from
-    // Watchlist — Watchlist contains ALL places and is the live monitor.
-    var token = gate.getToken();
-    try {
-      var r = await fetch(API_BASE + '/ew/places/' + id, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token },
-        body: JSON.stringify({ in_my_places: saved })
-      });
-      if (r.ok) await gate.refreshList();
-    } catch(e) { console.error('save to my places failed:', e); }
+    // v0.3.4: delegate to the gate. Works for anon (local flag, migrates on
+    // signup) and signed-in (server PATCH). One path, both tiers.
+    await gate.promote(id, saved);
   };
 
   const renamePlace = async (id, name) => {
