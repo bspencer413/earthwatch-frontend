@@ -53,7 +53,7 @@ const API_BASE = 'https://earthwatch-backend.onrender.com';
 const EW_BG = 'https://raw.githubusercontent.com/bspencer413/earthwatch-frontend/main/earthrise_bg.jpg';
 const EW_LOGIN_BG = 'https://raw.githubusercontent.com/bspencer413/earthwatch-frontend/main/earthrise_bg.jpg';
 const BILL_PHOTO = 'https://raw.githubusercontent.com/bspencer413/memorial-watch/main/Bill.jpeg';
-const APP_VERSION = '0.1.11';
+const APP_VERSION = '0.1.12';
 
 // === CW LEGACY (commented for EW) ============================================
 // FLEET_DATA, RISK_INDICATORS, findCruiseLineKey, editDistance, findShipSuggestion,
@@ -1356,7 +1356,7 @@ function App() {
                           <h3 className="font-bold text-white text-2xl mb-1">{g.name || 'Place'}</h3>
                           <ul className="mb-2 space-y-1">
                             {visibleItems.map(function(item) {
-                              return <li key={item.id} className="text-gray-200 text-base leading-snug">• {item.message}</li>;
+                              return <li key={item.id} className="text-gray-200 text-base leading-snug">• {item.message}{item.created_at && <span className="text-gray-400 text-sm"> · {formatRelativeTime(item.created_at)}</span>}</li>;
                             })}
                           </ul>
                           {moreCount > 0 && (
@@ -1364,7 +1364,7 @@ function App() {
                               {isExpanded ? 'Show less' : ('+ ' + moreCount + ' more ' + (moreCount === 1 ? 'alert' : 'alerts'))}
                             </button>
                           )}
-                          <p className="text-gray-200 text-sm mt-1 mb-2">{new Date(g.latest).toLocaleDateString()}</p>
+                          <p className="text-gray-200 text-sm mt-1 mb-2">{g.latest ? new Date(String(g.latest).replace(' ', 'T')).toLocaleDateString() : ''}</p>
                           <div className="flex gap-2">
                             <button onClick={() => {
                               var watchedPlace = places.find(function(p) { return p.id === g.watchlist_id; });
